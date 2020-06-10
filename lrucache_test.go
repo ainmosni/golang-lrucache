@@ -105,7 +105,25 @@ func TestExpiry(t *testing.T) {
 		_ = fc.Call(2)
 		_ = fc.Call(3)
 		if _, ok := fc.ResponsesLookup[1]; ok {
-			t.Fatal("Not evicted: 1")
+			t.Fatal("Not evicted: `1`")
+		}
+	})
+}
+
+func TestRecency(t *testing.T) {
+	t.Run("test cache expiry.", func(t *testing.T) {
+		fc := lrucache.New(3, factorial)
+		_ = fc.Call(1)
+		if fc.ResponsesList.Front().Value.(*lrucache.Entry).Key != 1 {
+			t.Fatal("`1` isn't in front of the cache.")
+		}
+		_ = fc.Call(2)
+		if fc.ResponsesList.Front().Value.(*lrucache.Entry).Key != 2 {
+			t.Fatal("`2` isn't in front of the cache.")
+		}
+		_ = fc.Call(1)
+		if fc.ResponsesList.Front().Value.(*lrucache.Entry).Key != 1 {
+			t.Fatal("`1` isn't in front of the cache.")
 		}
 	})
 }

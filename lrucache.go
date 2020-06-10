@@ -20,16 +20,17 @@ package lrucache
 import (
 	"container/list"
 	"log"
+	"sync"
 )
 
 // CachedFunc represents a function that we want to cache the responses from.
 type CachedFunc = func(a uint64) uint64
 
-// entry is a list entry, we're adding both key and value here so that we can easily remove it from
+// Entry is a list Entry, we're adding both key and value here so that we can easily remove it from
 // the lookup table.
-type entry struct {
-	key   uint64
-	value uint64
+type Entry struct {
+	Key   uint64
+	Value uint64
 }
 
 // Cache represents an instance of an LRU cache.
@@ -38,6 +39,7 @@ type Cache struct {
 	ResponsesList   *list.List
 	ResponsesLookup map[uint64]*list.Element
 	size            int
+	sync.Mutex
 }
 
 // New returns a new Cache instance.
@@ -58,8 +60,10 @@ func (c *Cache) Call(a uint64) uint64 {
 	el, ok := c.ResponsesLookup[a]
 	if ok {
 		log.Println("Cache hit")
+		c.Lock()
 		c.ResponsesList.MoveToFront(el)
-		return el.Value.(*entry).value
+		c.Unlock()
+		return el.Value.(*Entry).Value
 	}
 
 	log.Println("Cache miss")
@@ -71,17 +75,21 @@ func (c *Cache) Call(a uint64) uint64 {
 		log.Println("Cache is full, evicting least recently used.")
 		el := c.ResponsesList.Back()
 		if el != nil {
-			delete(c.ResponsesLookup, el.Value.(*entry).key)
+			c.Lock()
+			delete(c.ResponsesLookup, el.Value.(*Entry).Key)
 			c.ResponsesList.Remove(el)
+			c.Unlock()
 		}
 	}
 
 	log.Println("Adding entry to cache.")
-	e := &entry{
-		key:   a,
-		value: resp,
+	e := &Entry{
+		Key:   a,
+		Value: resp,
 	}
+	c.Lock()
 	el = c.ResponsesList.PushFront(e)
-	c.ResponsesLookup[e.key] = el
+	c.ResponsesLookup[e.Key] = el
+	c.Unlock()
 	return resp
 }
